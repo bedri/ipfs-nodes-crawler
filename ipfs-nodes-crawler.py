@@ -4,13 +4,11 @@
 """IPFS nodes crawler"""
 import ipfsApi
 import ipaddress
-from subprocess import check_output
+import subprocess
 
 
 def main():
     ipfs_diag_net()
-    get_nodes_ids()
-    get_nodes_info()
 
 
 def ipfs_diag_net():
@@ -18,54 +16,54 @@ def ipfs_diag_net():
     Gets raw output from:
     ipfs diag net 
     """
-    with open("ipfs_diag_net", "w") as ipfs_diag_net_f:
-        ipfs_diag_net_f.write(check_output("ipfs diag net", shell=True))
-    ipfs_diag_net_f.close()
+    ipfs_diag_net_out = subprocess.check_output("ipfs diag net", shell=True)
+    get_nodes_ids(ipfs_diag_net_out)
 
 
-
-def get_nodes_ids():
+def get_nodes_ids(ipfs_diag_net_out):
     """
     Parsing nodes IDs 
     """
-    with open("ipfs_diag_net", "r") as ipfs_diag_net_f:
-        for line in ipfs_diag_net_f:
-            line = line.strip()
-            if line.startswith("ID"):
-                with open("nodes_ids", "a") as nodes_ids_f:
-                    nodes_ids_f.write(line.strip().split(" ")[1]+"\n")
-        nodes_ids_f.close()
-    ipfs_diag_net_f.close()
+    node_ids_set = set()
+    for line in ipfs_diag_net_out.split("\n"):
+        line = line.strip()
+        if line.startswith("ID"):
+            line = line.strip().split(" ")[1]
+            node_ids_set.add(line)
+    get_nodes_info(node_ids_set)
 
 
-def get_nodes_info():
+def get_nodes_info(node_ids_set):
     """
     Gets raw info of the nodes parsed
     """
     ipfsClient = ipfsApi.Client('127.0.0.1', 5001)
-    with open("nodes_ids", "r") as nodes_ids_f:
-        for line in nodes_ids_f:
-            try:
-                node_info = ipfsClient.dht_findpeer(line.strip(), timeout=1)
-                public_ips(node_info)
-                with open("nodes_info", "a") as nodes_info_f:
-                    nodes_info_f.write(node_info) 
-            except:
-                pass
-    nodes_info_f.close()
-    nodes_ids_f.close()
+    for set_item in node_ids_set:
+        try:
+            node_info = ipfsClient.dht_findpeer(set_item, timeout=1)
+            public_ips(node_info)
+        except:
+            pass
 
 
 def public_ips(node_info):
     """
     Parsing public IPs from the raw node info
     """
+    ips_set = set()
     for i in range (0, len(node_info["Responses"])):
         for ip in node_info["Responses"][i]["Addrs"]:
             ip = ip.split("/")[2]
             if not ipaddress.ip_address(unicode(ip)).is_private:
-                with open("nodes_ips", "a") as nodes_ips_f:
-                    nodes_ips_f.write(ip + "\n")
+                ips_set.add(ip)
+    for set_item in ips_set:
+        with open("nodes_ips", "a") as nodes_ips_f:
+            nodes_ips_f.write(set_item + "\n")
+    nodes_ips_f.close()
+
+
+def geolocation():
+    pass
 
 
 if __name__ == "__main__":
