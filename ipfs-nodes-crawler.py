@@ -8,16 +8,16 @@ import subprocess
 
 
 def main():
-    ipfs_diag_net()
-
+    node_ids_set = get_nodes_ids(ipfs_diag_net())
+    get_nodes_info(node_ids_set)
+        
 
 def ipfs_diag_net():
     """
     Gets raw output from:
     ipfs diag net 
     """
-    ipfs_diag_net_out = subprocess.check_output("ipfs diag net", shell=True)
-    get_nodes_ids(ipfs_diag_net_out)
+    return subprocess.check_output("ipfs diag net", shell=True)
 
 
 def get_nodes_ids(ipfs_diag_net_out):
@@ -30,7 +30,7 @@ def get_nodes_ids(ipfs_diag_net_out):
         if line.startswith("ID"):
             line = line.strip().split(" ")[1]
             node_ids_set.add(line)
-    get_nodes_info(node_ids_set)
+    return node_ids_set
 
 
 def get_nodes_info(node_ids_set):
@@ -38,7 +38,8 @@ def get_nodes_info(node_ids_set):
     Gets raw info of the nodes parsed
     """
     ipfsClient = ipfsApi.Client('127.0.0.1', 5001)
-    for set_item in node_ids_set:
+    node_info_list = list()
+    for set_item in node_ids_set:    
         try:
             node_info = ipfsClient.dht_findpeer(set_item, timeout=1)
             public_ips(node_info)
@@ -56,10 +57,17 @@ def public_ips(node_info):
             ip = ip.split("/")[2]
             if not ipaddress.ip_address(unicode(ip)).is_private:
                 ips_set.add(ip)
-    for set_item in ips_set:
-        with open("nodes_ips", "a") as nodes_ips_f:
-            nodes_ips_f.write(set_item + "\n")
-    nodes_ips_f.close()
+    set_to_file(ips_set, "nodes_ips", "a") 
+
+
+def set_to_file(_set, file_name, mode):
+    """
+    helper function for writing set() elements to the file
+    """
+    for set_item in _set:
+        with open(file_name, mode) as file_name_f:
+            file_name_f.write(set_item + "\n")
+        file_name_f.close()
 
 
 def geolocation():
