@@ -6,21 +6,30 @@
 import ipfsApi
 import ipaddress
 import subprocess
-
+from geoip import geolite2
 
 def main():
     """
     The main heartbeat
     """
+        
     node_ids_set = get_nodes_ids(ipfs_diag_net())
     nodes_info_list = get_nodes_info(node_ids_set)
+    ips_set = set()
     for node_info in nodes_info_list:
         try:
-            ips_set = public_ips(node_info)
-            iteratable_space_to_file(ips_set, "nodes_ips", "a")
+            ips_list = get_ips(node_info)
+            for node_ip in ips_list:
+                if not ipaddress.ip_address(unicode(node_ip)).is_private:
+                    ips_set.add(node_ip)
         except:
             print "Some errors"
-
+    iteratable_space_to_file(ips_set, "nodes_ips", "a")
+    print geolocation(ips_set)
+    nodes_geolocation = geolocation(ips_set)
+    for node in nodes_geolocation:
+        print node.country
+        print node.location
 
 def ipfs_diag_net():
     """
@@ -51,24 +60,23 @@ def get_nodes_info(node_ids_set):
     node_info_list = list()
     for set_item in node_ids_set:
         try:
-            node_info = ipfs_client.dht_findpeer(set_item, timeout=1)
+            node_info = ipfs_client.dht_findpeer(set_item, timeout=5)
         except:
             print "Some errors"
         node_info_list.append(node_info)
     return node_info_list
 
 
-def public_ips(node_info):
+def get_ips(node_info):
     """
-    Parsing public IPs from the raw node info
+    Parsing IPs from the raw node info
     """
-    ips_set = set()
+    ips_list = list()
     for i in range(0, len(node_info["Responses"])):
         for node_ip in node_info["Responses"][i]["Addrs"]:
             node_ip = node_ip.split("/")[2]
-            if not ipaddress.ip_address(unicode(node_ip)).is_private:
-                ips_set.add(node_ip)
-    return ips_set
+            ips_list.append(node_ip)
+    return ips_list
 
 
 def iteratable_space_to_file(iteratable_space, file_name, mode):
@@ -81,11 +89,19 @@ def iteratable_space_to_file(iteratable_space, file_name, mode):
     file_name_f.close()
 
 
-def geolocation():
+def geolocation(ips_set):
     """
-    Geolocation function (goeip)
+    Geolocation function
     """
-    pass
+    geolocation_list = list() 
+    for node_ip in ips_set:
+        try:
+            match = geolite2.lookup(node_ip)
+            if match is not None:
+                geolocation_list.append(match)
+        except:
+            pass
+    return geolocation_list
 
 
 if __name__ == "__main__":
