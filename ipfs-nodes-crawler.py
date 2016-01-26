@@ -6,6 +6,7 @@
 import ipfsApi
 import ipaddress
 import subprocess
+import pymongo
 from geoip import geolite2
 
 def main():
@@ -13,8 +14,8 @@ def main():
     The main heartbeat
     """
         
-    node_ids_set = get_nodes_ids(ipfs_diag_net())
-    nodes_info_list = get_nodes_info(node_ids_set)
+    nodes_ids_set = get_nodes_ids(ipfs_diag_net())
+    nodes_info_list = get_nodes_info(nodes_ids_set)
     ips_set = set()
     for node_info in nodes_info_list:
         try:
@@ -24,12 +25,16 @@ def main():
                     ips_set.add(node_ip)
         except:
             print "Some errors"
+
+    iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
     iteratable_space_to_file(ips_set, "nodes_ips", "a")
-    print geolocation(ips_set)
+    iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
+
     nodes_geolocation = geolocation(ips_set)
     for node in nodes_geolocation:
         print node.country
         print node.location
+
 
 def ipfs_diag_net():
     """
@@ -60,7 +65,7 @@ def get_nodes_info(node_ids_set):
     node_info_list = list()
     for set_item in node_ids_set:
         try:
-            node_info = ipfs_client.dht_findpeer(set_item, timeout=5)
+            node_info = ipfs_client.dht_findpeer(set_item, timeout=6)
         except:
             print "Some errors"
         node_info_list.append(node_info)
@@ -85,7 +90,7 @@ def iteratable_space_to_file(iteratable_space, file_name, mode):
     """
     for item in iteratable_space:
         with open(file_name, mode) as file_name_f:
-            file_name_f.write(item + "\n")
+            file_name_f.write(str(item) + "\n")
     file_name_f.close()
 
 
@@ -95,13 +100,14 @@ def geolocation(ips_set):
     """
     geolocation_list = list() 
     for node_ip in ips_set:
-        try:
-            match = geolite2.lookup(node_ip)
-            if match is not None:
-                geolocation_list.append(match)
-        except:
-            pass
+        match = geolite2.lookup(node_ip)
+        if match is not None:
+            geolocation_list.append(match)
     return geolocation_list
+
+
+def geolocation_to_mdb(geolocation_list):
+    pass
 
 
 if __name__ == "__main__":
