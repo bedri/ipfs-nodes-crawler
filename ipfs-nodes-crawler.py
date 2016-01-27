@@ -13,7 +13,6 @@ def main():
     """
     The main heartbeat
     """
-        
     nodes_ids_set = get_nodes_ids(ipfs_diag_net())
     nodes_info_list = get_nodes_info(nodes_ids_set)
     ips_set = set()
@@ -25,15 +24,15 @@ def main():
                     ips_set.add(node_ip)
         except:
             print "Some errors"
-
+    """
     iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
     iteratable_space_to_file(ips_set, "nodes_ips", "a")
     iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
-
+    """
     nodes_geolocation = geolocation(ips_set)
-    for node in nodes_geolocation:
-        print node.country
-        print node.location
+    mongo_client = pymongo.MongoClient()
+    db = mongo_client.ipfs.nodes
+    geolocation_to_mdb(nodes_geolocation, db)
 
 
 def ipfs_diag_net():
@@ -106,9 +105,14 @@ def geolocation(ips_set):
     return geolocation_list
 
 
-def geolocation_to_mdb(geolocation_list):
-    pass
-
+def geolocation_to_mdb(geolocation_list, db):
+    """
+    Update location, ip and country to mongoDB ( do not insert new ones )
+    """
+    for node in geolocation_list:
+        document = {"location":node.location, "ip":node.ip, "country":node.country} 
+        db.replace_one(document, document, upsert=True)
+    
 
 if __name__ == "__main__":
     main()
