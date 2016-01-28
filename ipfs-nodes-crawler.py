@@ -29,10 +29,17 @@ def main():
     iteratable_space_to_file(ips_set, "nodes_ips", "a")
     iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
     """
+    iteratable_space_to_output(nodes_ids_set)
+    iteratable_space_to_output(ips_set)
+    iteratable_space_to_output(nodes_info_list)
     nodes_geolocation = geolocation(ips_set)
     mongo_client = pymongo.MongoClient()
-    db = mongo_client.ipfs.nodes
-    geolocation_to_mdb(nodes_geolocation, db)
+    ipfs_db = mongo_client.ipfs.nodes
+    geolocation_to_mdb(nodes_geolocation, ipfs_db)
+
+
+def crawl_and_parse():
+    pass
 
 
 def ipfs_diag_net():
@@ -93,6 +100,14 @@ def iteratable_space_to_file(iteratable_space, file_name, mode):
     file_name_f.close()
 
 
+def iteratable_space_to_output(iteratable_space):
+    """
+    helper function for writing iteratable space's elements to output
+    """
+    for item in iteratable_space:
+        print item
+
+
 def geolocation(ips_set):
     """
     Geolocation function
@@ -110,9 +125,18 @@ def geolocation_to_mdb(geolocation_list, db):
     Update location, ip and country to mongoDB ( do not insert new ones )
     """
     for node in geolocation_list:
-        document = {"location":node.location, "ip":node.ip, "country":node.country} 
+        document = {"ip":node.ip,
+                    "country":node.country,
+                    "continent":node.continent,
+                    "subdivisions":str(node.subdivisions),
+                    "timezone":node.timezone,
+                    "location":node.location}
         db.replace_one(document, document, upsert=True)
-    
+
+
+def get_location_from_mdb():
+    pass
+        
 
 if __name__ == "__main__":
     main()
