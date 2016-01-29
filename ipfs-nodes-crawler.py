@@ -16,12 +16,18 @@ def main():
     nodes_ids_set = get_nodes_ids(ipfs_diag_net())
     nodes_info_list = get_nodes_info(nodes_ids_set)
     ips_set = set()
+    id_ips_dict = dict()
     for node_info in nodes_info_list:
         try:
-            ips_list = get_ips(node_info)
-            for node_ip in ips_list:
-                if not ipaddress.ip_address(unicode(node_ip)).is_private:
-                    ips_set.add(node_ip)
+            id_ips_dict = get_id_ips(node_info)
+            for node_id, node_ips in id_ips_dict.iteritems():
+                for ip in node_ips:
+                    if not ipaddress.ip_address(unicode(ip)).is_private:
+                        ips_set.add(ip)
+                id_ips_dict_new = ({node_id:ips_set})
+            ips_set = set()
+        #geolocation_to_mdb
+            print id_ips_dict_new
         except:
             print "Some errors"
     """
@@ -29,6 +35,7 @@ def main():
     iteratable_space_to_file(ips_set, "nodes_ips", "a")
     iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
     """
+    """ 
     iteratable_space_to_output(nodes_ids_set)
     iteratable_space_to_output(ips_set)
     iteratable_space_to_output(nodes_info_list)
@@ -36,7 +43,7 @@ def main():
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
     geolocation_to_mdb(nodes_geolocation, ipfs_db)
-
+    """
 
 def crawl_and_parse():
     pass
@@ -78,16 +85,22 @@ def get_nodes_info(node_ids_set):
     return node_info_list
 
 
-def get_ips(node_info):
+def get_id_ips(node_info):
     """
     Parsing IPs from the raw node info
     """
+
     ips_list = list()
+    id_ips_dict = dict()
     for i in range(0, len(node_info["Responses"])):
         for node_ip in node_info["Responses"][i]["Addrs"]:
             node_ip = node_ip.split("/")[2]
             ips_list.append(node_ip)
-    return ips_list
+        node_id = node_info["Responses"][i]["ID"]
+        id_ips_dict.update({node_id:ips_list})
+            
+#    return ips_list, id_ip.dict
+    return id_ips_dict
 
 
 def iteratable_space_to_file(iteratable_space, file_name, mode):
