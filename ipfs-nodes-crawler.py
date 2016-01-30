@@ -17,6 +17,10 @@ def main():
     nodes_info_list = get_nodes_info(nodes_ids_set)
     ips_set = set()
     id_ips_dict = dict()
+    
+    mongo_client = pymongo.MongoClient()
+    ipfs_db = mongo_client.ipfs.nodes
+    
     for node_info in nodes_info_list:
         try:
             id_ips_dict = get_id_ips(node_info)
@@ -25,11 +29,17 @@ def main():
                     if not ipaddress.ip_address(unicode(ip)).is_private:
                         ips_set.add(ip)
                 id_ips_dict_new = ({node_id:ips_set})
-            ips_set = set()
-        #geolocation_to_mdb
-            print id_ips_dict_new
+                ips_set =  set()
+
+            geolocation_list = geolocation(id_ips_dict_new[node_id])
+            if geolocation_list:
+#                print geolocation_list
+                geolocation_to_mdb(geolocation_list, node_id,
+                        id_ips_dict_new[node_id], ipfs_db)
         except:
-            print "Some errors"
+            pass
+            #print "Some errors"
+    
     """
     iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
     iteratable_space_to_file(ips_set, "nodes_ips", "a")
@@ -39,10 +49,6 @@ def main():
     iteratable_space_to_output(nodes_ids_set)
     iteratable_space_to_output(ips_set)
     iteratable_space_to_output(nodes_info_list)
-    nodes_geolocation = geolocation(ips_set)
-    mongo_client = pymongo.MongoClient()
-    ipfs_db = mongo_client.ipfs.nodes
-    geolocation_to_mdb(nodes_geolocation, ipfs_db)
     """
 
 def crawl_and_parse():
@@ -89,7 +95,6 @@ def get_id_ips(node_info):
     """
     Parsing IPs from the raw node info
     """
-
     ips_list = list()
     id_ips_dict = dict()
     for i in range(0, len(node_info["Responses"])):
@@ -125,7 +130,8 @@ def geolocation(ips_set):
     """
     Geolocation function
     """
-    geolocation_list = list() 
+    geolocation_list = list()
+#    geolocation_set = set()
     for node_ip in ips_set:
         match = geolite2.lookup(node_ip)
         if match is not None:
@@ -133,18 +139,21 @@ def geolocation(ips_set):
     return geolocation_list
 
 
-def geolocation_to_mdb(geolocation_list, db):
+def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
     """
     Update location, ip and country to mongoDB ( do not insert new ones )
     """
+    
     for node in geolocation_list:
-        document = {"ip":node.ip,
+        document = {"IP":node.ip,
                     "country":node.country,
                     "continent":node.continent,
                     "subdivisions":str(node.subdivisions),
                     "timezone":node.timezone,
                     "location":node.location}
-        db.replace_one(document, document, upsert=True)
+        print type(document)
+        print document.values
+        ipfs_db.replace_one(document, document, upsert=True)
 
 
 def get_location_from_mdb():
