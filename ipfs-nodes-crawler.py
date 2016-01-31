@@ -33,17 +33,18 @@ def main():
 
             geolocation_list = geolocation(id_ips_dict_new[node_id])
             if geolocation_list:
-#                print geolocation_list
                 geolocation_to_mdb(geolocation_list, node_id,
                         id_ips_dict_new[node_id], ipfs_db)
         except:
             pass
             #print "Some errors"
-    
-    """
-    iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
-    iteratable_space_to_file(ips_set, "nodes_ips", "a")
-    iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
+    """ 
+    if nodes_ids_set: 
+        iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
+    if ips_set:
+        iteratable_space_to_file(ips_set, "nodes_ips", "a")
+    if nodes_info_list:
+        iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
     """
     """ 
     iteratable_space_to_output(nodes_ids_set)
@@ -103,8 +104,6 @@ def get_id_ips(node_info):
             ips_list.append(node_ip)
         node_id = node_info["Responses"][i]["ID"]
         id_ips_dict.update({node_id:ips_list})
-            
-#    return ips_list, id_ip.dict
     return id_ips_dict
 
 
@@ -131,7 +130,6 @@ def geolocation(ips_set):
     Geolocation function
     """
     geolocation_list = list()
-#    geolocation_set = set()
     for node_ip in ips_set:
         match = geolite2.lookup(node_ip)
         if match is not None:
@@ -143,16 +141,15 @@ def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
     """
     Update location, ip and country to mongoDB ( do not insert new ones )
     """
-    
     for node in geolocation_list:
-        document = {"IP":node.ip,
+        document = {"node_id":node_id,
+                    "ips_set":str(ips_set),
+                    "ip":node.ip,
                     "country":node.country,
                     "continent":node.continent,
                     "subdivisions":str(node.subdivisions),
                     "timezone":node.timezone,
                     "location":node.location}
-        print type(document)
-        print document.values
         ipfs_db.replace_one(document, document, upsert=True)
 
 
