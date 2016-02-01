@@ -3,6 +3,8 @@
 
 
 """IPFS nodes crawler"""
+import sys
+import logging
 import ipfsApi
 import ipaddress
 import subprocess
@@ -13,31 +15,44 @@ def main():
     """
     The main heartbeat
     """
-    nodes_ids_set = get_nodes_ids(ipfs_diag_net())
+    logging.basicConfig(format='%(asctime)s %(message)s',
+                    datefmt='%Y/%m/%d %H:%M:%S',
+                    filename='crawler.log',
+                    level=logging.DEBUG)
+    
+    logging.info("Running 'ipfs diag net'")
+    ipfs_diag_net_output=ipfs_diag_net()
+    logging.info("Getting node IDs")
+    nodes_ids_set = get_nodes_ids(ipfs_diag_net_output)
+    logging.info("Running through node IDs for info")
     nodes_info_list = get_nodes_info(nodes_ids_set)
     ips_set = set()
     id_ips_dict = dict()
     
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
-    
+   
     for node_info in nodes_info_list:
         try:
+            logging.info("Getting node {ID:IPs} dictionary")
             id_ips_dict = get_id_ips(node_info)
+            logging.info("Parsing all IPs from node info")
             for node_id, node_ips in id_ips_dict.iteritems():
+                logging.info("Parsing external IPs")
                 for ip in node_ips:
                     if not ipaddress.ip_address(unicode(ip)).is_private:
                         ips_set.add(ip)
                 id_ips_dict_new = ({node_id:ips_set})
                 ips_set =  set()
-
+            logging.info("Getting geolocation object")
             geolocation_list = geolocation(id_ips_dict_new[node_id])
             if geolocation_list:
+                logging.info("Writing node data to mongoDB")
                 geolocation_to_mdb(geolocation_list, node_id,
                         id_ips_dict_new[node_id], ipfs_db)
         except:
-            pass
-            #print "Some errors"
+            logging.error("Error encountered")
+            print sys.exc_info()[0]
     """ 
     if nodes_ids_set: 
         iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
@@ -83,12 +98,15 @@ def get_nodes_info(node_ids_set):
     """
     ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
     node_info_list = list()
+    logging.info("Searching node info on DHT")
     for set_item in node_ids_set:
         try:
             node_info = ipfs_client.dht_findpeer(set_item, timeout=6)
         except:
-            print "Some errors"
-        node_info_list.append(node_info)
+            logging.error("Error encountered")
+            print sys.exc_info()[0]
+        if node_info:
+            node_info_list.append(node_info)
     return node_info_list
 
 
@@ -156,6 +174,9 @@ def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
 def get_location_from_mdb():
     pass
         
+
+def get_node_id_from_mdb():
+    pass
 
 if __name__ == "__main__":
     main()
