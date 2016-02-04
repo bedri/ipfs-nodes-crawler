@@ -19,13 +19,14 @@ def main():
                     datefmt='%Y/%m/%d %H:%M:%S',
                     filename='crawler.log',
                     level=logging.DEBUG)
-    
+    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
+
     logging.info("Running 'ipfs diag net'")
     ipfs_diag_net_output=ipfs_diag_net()
     logging.info("Getting node IDs")
     nodes_ids_set = get_nodes_ids(ipfs_diag_net_output)
     logging.info("Running through node IDs for info")
-    nodes_info_list = get_nodes_info(nodes_ids_set)
+    nodes_info_list = get_nodes_info(nodes_ids_set, ipfs_client)
     ips_set = set()
     id_ips_dict = dict()
     
@@ -36,31 +37,34 @@ def main():
         try:
             logging.info("Getting node {ID:IPs} dictionary")
             id_ips_dict = get_id_ips(node_info)
-            logging.info("Parsing all IPs from node info")
-            for node_id, node_ips in id_ips_dict.iteritems():
-                logging.info("Parsing external IPs")
-                for ip in node_ips:
-                    if not ipaddress.ip_address(unicode(ip)).is_private:
-                        ips_set.add(ip)
-                id_ips_dict_new = ({node_id:ips_set})
-                ips_set =  set()
-            logging.info("Getting geolocation object")
-            geolocation_list = geolocation(id_ips_dict_new[node_id])
-            if geolocation_list:
-                logging.info("Writing node data to mongoDB")
-                geolocation_to_mdb(geolocation_list, node_id,
+            print id_ips_dict
+            if len(id_ips_dict) > 0:
+                logging.info("Parsing all IPs from node info")
+                for node_id, node_ips in id_ips_dict.iteritems():
+                    logging.info("Parsing external IPs")
+                    for ip in node_ips:
+                        if not ipaddress.ip_address(unicode(ip)).is_private:
+                            ips_set.add(ip)
+                    id_ips_dict_new = ({node_id:ips_set})
+                    ips_set =  set()
+                logging.info("Getting geolocation object")
+                geolocation_list = geolocation(id_ips_dict_new[node_id])
+                if geolocation_list:
+                    logging.info("Writing node data to mongoDB")
+                    geolocation_to_mdb(geolocation_list, node_id,
                         id_ips_dict_new[node_id], ipfs_db)
         except:
             logging.error("Error encountered")
             print sys.exc_info()[0]
-    """ 
+         
+     
     if nodes_ids_set: 
         iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
         iteratable_space_to_file(ips_set, "nodes_ips", "a")
     if nodes_info_list:
         iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
-    """
+    
     """ 
     iteratable_space_to_output(nodes_ids_set)
     iteratable_space_to_output(ips_set)
@@ -92,16 +96,15 @@ def get_nodes_ids(ipfs_diag_net_out):
     return node_ids_set
 
 
-def get_nodes_info(node_ids_set):
+def get_nodes_info(node_ids_set, ipfs_client):
     """
     Returns list of raw info of the nodes
     """
-    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
     node_info_list = list()
     logging.info("Searching node info on DHT")
     for set_item in node_ids_set:
         try:
-            node_info = ipfs_client.dht_findpeer(set_item, timeout=6)
+            node_info = ipfs_client.dht_findpeer(set_item, timeout=10)
         except:
             logging.error("Error encountered")
             print sys.exc_info()[0]
@@ -116,12 +119,14 @@ def get_id_ips(node_info):
     """
     ips_list = list()
     id_ips_dict = dict()
-    for i in range(0, len(node_info["Responses"])):
-        for node_ip in node_info["Responses"][i]["Addrs"]:
-            node_ip = node_ip.split("/")[2]
-            ips_list.append(node_ip)
-        node_id = node_info["Responses"][i]["ID"]
-        id_ips_dict.update({node_id:ips_list})
+    responses = node_info["Responses"]
+    if len(responses) > 0:
+        for i in range(0, len(responses)):
+            for node_ip in responses[i]["Addrs"]:
+                node_ip = node_ip.split("/")[2]
+                ips_list.append(node_ip)
+            node_id = responses[i]["ID"]
+            id_ips_dict.update({node_id:ips_list})
     return id_ips_dict
 
 
@@ -131,6 +136,7 @@ def iteratable_space_to_file(iteratable_space, file_name, mode):
     """
     for item in iteratable_space:
         with open(file_name, mode) as file_name_f:
+            file_name_f.write("New item:\n")
             file_name_f.write(str(item) + "\n")
     file_name_f.close()
 
