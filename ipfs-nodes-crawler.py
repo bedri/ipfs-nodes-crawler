@@ -4,11 +4,13 @@
 
 """IPFS nodes crawler"""
 import sys
+import json
 import logging
 import ipfsApi
 import ipaddress
 import subprocess
 import pymongo
+
 from geoip import geolite2
 
 def main():
@@ -32,13 +34,14 @@ def main():
     
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
-   
     for node_info in nodes_info_list:
+        print type(node_info)
+        print "NODE INFO:\n"
+        print node_info
         try:
             logging.info("Getting node {ID:IPs} dictionary")
             id_ips_dict = get_id_ips(node_info)
-            print id_ips_dict
-            if len(id_ips_dict) > 0:
+            if len(id_ips_dict) > 0 and isinstance(id_ips_dict, dict):
                 logging.info("Parsing all IPs from node info")
                 for node_id, node_ips in id_ips_dict.iteritems():
                     logging.info("Parsing external IPs")
@@ -54,7 +57,8 @@ def main():
                     geolocation_to_mdb(geolocation_list, node_id,
                         id_ips_dict_new[node_id], ipfs_db)
         except:
-            logging.error("Error encountered")
+            log_error = "Error processing node info"
+            logging.error(log_error)
             print sys.exc_info()[0]
          
      
@@ -98,7 +102,7 @@ def get_nodes_ids(ipfs_diag_net_out):
 
 def get_nodes_info(node_ids_set, ipfs_client):
     """
-    Returns list of raw info of the nodes
+    Returns list of raw info of the nodes, sometimes it gets string instead of dict, which is handled differently.
     """
     node_info_list = list()
     logging.info("Searching node info on DHT")
@@ -106,11 +110,29 @@ def get_nodes_info(node_ids_set, ipfs_client):
         try:
             node_info = ipfs_client.dht_findpeer(set_item, timeout=10)
         except:
-            logging.error("Error encountered")
+            logging.error("Error parsing DHT")
             print sys.exc_info()[0]
-        if node_info:
+        if isinstance(node_info, dict):
             node_info_list.append(node_info)
+        elif isinstance(node_info, unicode):
+            node_info_list_d = parse_unicode_string(node_info)
+            for node_info_dict in node_info_list_d:
+                node_info_list.append(node_info_dict)
     return node_info_list
+
+
+def parse_unicode_string(node_info):
+    """
+    Function to parse and create dicts from the unicode strings returned by ipfs net diag
+    (this happens when multiple DHT nodes are traversed)
+    Returns list of dicts
+    """
+    node_info_list_d = list()
+    for node in node_info.strip().split("\n"):
+        node_json = json.loads(node)
+        if node_json["Responses"]:
+           node_info_list_d.append(node_json)
+    return node_info_list_d
 
 
 def get_id_ips(node_info):
