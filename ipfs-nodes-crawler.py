@@ -3,6 +3,7 @@
 
 
 """IPFS nodes crawler"""
+from util.iter_space import *
 import sys
 import json
 import logging
@@ -36,7 +37,7 @@ def main():
     ipfs_db = mongo_client.ipfs.nodes
     for node_info in nodes_info_list:
         print type(node_info)
-        print "NODE INFO:\n"
+        print "NODE INFO:"
         print node_info
         try:
             logging.info("Getting node {ID:IPs} dictionary")
@@ -63,21 +64,12 @@ def main():
          
      
     if nodes_ids_set: 
-        iteratable_space_to_file(nodes_ids_set, "nodes_ids", "a")
+        to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
-        iteratable_space_to_file(ips_set, "nodes_ips", "a")
+        to_file(ips_set, "nodes_ips", "a")
     if nodes_info_list:
-        iteratable_space_to_file(nodes_info_list, "nodes_info", "a")
+        to_file(nodes_info_list, "nodes_info", "a")
     
-    """ 
-    iteratable_space_to_output(nodes_ids_set)
-    iteratable_space_to_output(ips_set)
-    iteratable_space_to_output(nodes_info_list)
-    """
-
-def crawl_and_parse():
-    pass
-
 
 def ipfs_diag_net():
     """
@@ -152,25 +144,6 @@ def get_id_ips(node_info):
     return id_ips_dict
 
 
-def iteratable_space_to_file(iteratable_space, file_name, mode):
-    """
-    helper function for writing iteratable space's elements to the file
-    """
-    for item in iteratable_space:
-        with open(file_name, mode) as file_name_f:
-            file_name_f.write("New item:\n")
-            file_name_f.write(str(item) + "\n")
-    file_name_f.close()
-
-
-def iteratable_space_to_output(iteratable_space):
-    """
-    helper function for writing iteratable space's elements to output
-    """
-    for item in iteratable_space:
-        print item
-
-
 def geolocation(ips_set):
     """
     Geolocation function
@@ -189,7 +162,7 @@ def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
     """
     for node in geolocation_list:
         document = {"node_id":node_id,
-                    "ips_set":str(ips_set),
+#                    "ips_set":str(ips_set),
                     "ip":node.ip,
                     "country":node.country,
                     "continent":node.continent,
@@ -199,14 +172,5 @@ def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
         ipfs_db.replace_one(document, document, upsert=True)
 
 
-def get_location_from_mdb():
-    pass
-        
-
-def get_node_id_from_mdb():
-    pass
-
 if __name__ == "__main__":
     main()
-
-
