@@ -107,9 +107,10 @@ def get_nodes_info(node_ids_set, ipfs_client):
         if isinstance(node_info, dict):
             node_info_list.append(node_info)
         elif isinstance(node_info, unicode):
-            node_info_list_d = parse_unicode_string(node_info)
-            for node_info_dict in node_info_list_d:
-                node_info_list.append(node_info_dict)
+            pass
+            #node_info_list_d = parse_unicode_string(node_info)
+            #for node_info_dict in node_info_list_d:
+            #    node_info_list.append(node_info_dict)
     return node_info_list
 
 
