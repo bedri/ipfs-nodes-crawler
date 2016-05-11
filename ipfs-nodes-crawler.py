@@ -43,6 +43,8 @@ def main():
                 logging.info("PARSING ALL IPS FROM NODE INFO")
                 for node_id, node_ips in id_ips_dict.iteritems():
                     logging.info("PARSING EXTERNAL IPs for %s", node_id)
+                    set_tmp = set(node_ips)
+                    node_ips = list(set_tmp)
                     for ip in node_ips:
                         logging.info("Checking %s", ip)
                         if not ipaddress.ip_address(unicode(ip)).is_private:
@@ -98,28 +100,20 @@ def get_nodes_info(node_ids_set, ipfs_client):
         logging.info("Parsing node %s", set_item)
         try:
             node_info = ipfs_client.dht_findpeer(set_item, timeout=10)
-            print "NODEINFOTYPE:"
-            print type(node_info)
-            print node_info
+      #      print "NODEINFOTYPE:"
+      #      print type(node_info)
+      #      print node_info
         except:
             error = sys.exc_info()[0]
             logging.error("ERROR PARSING DHT: %s", error)
             print error
-       
         if isinstance(node_info, dict):
             node_info_list.append(node_info)
         elif isinstance(node_info, list):
             for list_item in node_info:
                 node_info_list.append(list_item)
-            #TODO
-        """ Unicode output changed to list 
-
-        elif isinstance(node_info, unicode):
-            node_info_list_d = parse_unicode_string(node_info)
-            for node_info_dict in node_info_list_d:
-                node_info_list.append(node_info_dict)
-        """
     return node_info_list
+
 
 def parse_unicode_string(node_info):
     """
@@ -154,9 +148,15 @@ def get_id_ips(node_info):
             node_id = responses[i]["ID"]
             set_tmp = set(ips_list)
             ips_list = list(set_tmp)
+#            print "NODEID TYPE:"
+#            print type(node_id)
+#            print "IPSLIST TYPE:"
+#            print type(ips_list)
             id_ips_dict.update({node_id:ips_list})
             logging.info("Node ID and IPs: %s:%s", node_id, ips_list)
-    return id_ips_dict
+        return id_ips_dict
+    else:
+        return None
 
 
 def geolocation(ips_set):
