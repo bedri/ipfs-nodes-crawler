@@ -36,38 +36,38 @@ def main():
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
     for node_info in nodes_info_list:
-        try:
-            logging.info("GETTING NODE {ID:IPs} DICTIONARY")
-            id_ips_dict = get_id_ips(node_info)
-            if len(id_ips_dict) > 0 and isinstance(id_ips_dict, dict):
-                logging.info("PARSING ALL IPS FROM NODE INFO")
-                for node_id, node_ips in id_ips_dict.iteritems():
-                    logging.info("PARSING EXTERNAL IPs for %s", node_id)
-                    set_tmp = set(node_ips)
-                    node_ips = list(set_tmp)
-                    for ip in node_ips:
-                        logging.info("Checking %s", ip)
-                        if not ipaddress.ip_address(unicode(ip)).is_private:
-                            ips_set.add(ip)
-                    id_ips_dict_new = ({node_id:ips_set})
-                    ips_set =  set()
-                geolocation_list = geolocation(id_ips_dict_new[node_id])
-                if geolocation_list:
-                    geolocation_to_mdb(geolocation_list, node_id,
-                        id_ips_dict_new[node_id], ipfs_db)
-        except:
-            error = sys.exc_info()[0]
-            logging.error("ERROR PROCESSING NODE INFO: %s", error)
-            print error
+        if node_info["Responses"] is not None:
+            try:
+                logging.info("GETTING NODE {ID:IPs} DICTIONARY")
+                id_ips_dict = get_id_ips(node_info)
+                if id_ips_dict is not None and len(id_ips_dict) > 0 and isinstance(id_ips_dict, dict):
+                    logging.info("PARSING ALL IPS FROM NODE INFO")
+                    for node_id, node_ips in id_ips_dict.iteritems():
+                        logging.info("PARSING EXTERNAL IPs for %s", node_id)
+                        set_tmp = set(node_ips)
+                        node_ips = list(set_tmp)
+                        for ip in node_ips:
+                            logging.info("Checking %s", ip)
+                            if not ipaddress.ip_address(unicode(ip)).is_private:
+                                ips_set.add(ip)
+                        id_ips_dict_new = ({node_id:ips_set})
+                        ips_set =  set()
+                    geolocation_list = geolocation(id_ips_dict_new[node_id])
+                    if geolocation_list:
+                        geolocation_to_mdb(geolocation_list, node_id,
+                            id_ips_dict_new[node_id], ipfs_db)
+            except:
+                error = sys.exc_info()[0]
+                logging.error("ERROR PROCESSING NODE INFO: %s", error)
          
-     
+    """ 
     if nodes_ids_set: 
         to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
         to_file(ips_set, "nodes_ips", "a")
     if nodes_info_list:
         to_file(nodes_info_list, "nodes_info", "a")
-    
+    """
 
 def ipfs_diag_net():
     """
@@ -90,9 +90,17 @@ def get_nodes_ids(ipfs_diag_net_out):
     return node_ids_set
 
 
+def get_nodes_info_id():
+    """
+    From 'id <id>'
+    """
+    pass
+
+
 def get_nodes_info(node_ids_set, ipfs_client):
     """
     Returns list of raw info of the nodes, sometimes it gets string instead of dict, which is handled differently.
+    From 'dht findpeer'
     """
     node_info_list = list()
     logging.info("SEARCHING NODE INFO ON DHT")
@@ -100,13 +108,9 @@ def get_nodes_info(node_ids_set, ipfs_client):
         logging.info("Parsing node %s", set_item)
         try:
             node_info = ipfs_client.dht_findpeer(set_item, timeout=10)
-      #      print "NODEINFOTYPE:"
-      #      print type(node_info)
-      #      print node_info
         except:
             error = sys.exc_info()[0]
             logging.error("ERROR PARSING DHT: %s", error)
-            print error
         if isinstance(node_info, dict):
             node_info_list.append(node_info)
         elif isinstance(node_info, list):
@@ -140,7 +144,7 @@ def get_id_ips(node_info):
     ips_set = set()
     id_ips_dict = dict()
     responses = node_info["Responses"]
-    if len(responses) > 0:
+    if len(responses) > 0 and responses != 'None':
         for i in range(0, len(responses)):
             for node_ip in responses[i]["Addrs"]:
                 node_ip = node_ip.split("/")[2]
@@ -148,10 +152,6 @@ def get_id_ips(node_info):
             node_id = responses[i]["ID"]
             set_tmp = set(ips_list)
             ips_list = list(set_tmp)
-#            print "NODEID TYPE:"
-#            print type(node_id)
-#            print "IPSLIST TYPE:"
-#            print type(ips_list)
             id_ips_dict.update({node_id:ips_list})
             logging.info("Node ID and IPs: %s:%s", node_id, ips_list)
         return id_ips_dict
