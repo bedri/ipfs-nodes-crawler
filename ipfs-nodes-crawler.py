@@ -22,8 +22,13 @@ def main():
                     datefmt='%Y%m%d %H%M%S',
                     filename='crawler.log',
                     level=logging.DEBUG)
-    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
+    get_nodes_info_id()
+#    default_crawler()
+    
 
+
+def default_crawler():
+    i1pfs_client = ipfsApi.Client('127.0.0.1', 5001)
     logging.info("RUNNING 'ipfs diag net'")
     ipfs_diag_net_output=ipfs_diag_net()
     logging.info("GETTING NODE IDs")
@@ -35,6 +40,8 @@ def main():
     
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
+
+
     for node_info in nodes_info_list:
         if node_info["Responses"] is not None:
             try:
@@ -59,15 +66,15 @@ def main():
             except:
                 error = sys.exc_info()[0]
                 logging.error("ERROR PROCESSING NODE INFO: %s", error)
-         
-    """ 
+    
+ 
     if nodes_ids_set: 
         to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
         to_file(ips_set, "nodes_ips", "a")
     if nodes_info_list:
         to_file(nodes_info_list, "nodes_info", "a")
-    """
+ 
 
 def ipfs_diag_net():
     """
@@ -93,8 +100,20 @@ def get_nodes_ids(ipfs_diag_net_out):
 def get_nodes_info_id():
     """
     From 'id <id>'
+    subprocess.check_output 
     """
-    pass
+    
+    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
+    ids_set = set(line.rstrip('\n') for line in open('nodes_ids'))
+    for _id in ids_set:
+#        if subprocess.check_call(["ipfs", "ping", "-n", "1", _id]):
+ #           print "OK"
+        try:
+            print subprocess.check_output(["ipfs", "id", _id])
+        except:
+            print sys.exc_info()[0]        
+
+
 
 
 def get_nodes_info(node_ids_set, ipfs_client):

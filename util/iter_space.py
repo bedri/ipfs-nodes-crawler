@@ -8,7 +8,7 @@ def to_file(iteratable_space, file_name, mode):
     """
     for item in iteratable_space:
         with open(file_name, mode) as file_name_f:
-            file_name_f.write("New item:\n")
+#            file_name_f.write("New item:\n")
             file_name_f.write(str(item) + "\n")
     file_name_f.close()
 
