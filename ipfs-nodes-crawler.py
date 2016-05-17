@@ -28,7 +28,7 @@ def main():
 
 
 def default_crawler():
-    i1pfs_client = ipfsApi.Client('127.0.0.1', 5001)
+    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
     logging.info("RUNNING 'ipfs diag net'")
     ipfs_diag_net_output=ipfs_diag_net()
     logging.info("GETTING NODE IDs")
@@ -103,13 +103,35 @@ def get_nodes_info_id():
     subprocess.check_output 
     """
     
+    mongo_client = pymongo.MongoClient()
+    ipfs_db = mongo_client.ipfs.id2ip
+    
     ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
     ids_set = set(line.rstrip('\n') for line in open('nodes_ids'))
+#    ips_set = set()
+#    nodes_info_dict = dict()
     for _id in ids_set:
-#        if subprocess.check_call(["ipfs", "ping", "-n", "1", _id]):
- #           print "OK"
+        ips_set = set()
+        nodes_info_dict = dict()
+        geolocation_list = list() 
         try:
-            print subprocess.check_output(["ipfs", "id", _id])
+            id_str = subprocess.check_output(["ipfs", "id", _id])
+            id_json = json.loads(id_str)
+            addresses = id_json["Addresses"]
+            if isinstance(addresses, list):
+                for _ip in addresses:
+                    ip = _ip.split("/")[2]
+                    if not ipaddress.ip_address(unicode(ip)).is_private:
+                        ips_set.add(ip)
+             
+            nodes_info_dict = ({_id:ips_set})
+            geolocation_list = geolocation(nodes_info_dict[_id])
+            
+            if geolocation_list:
+               geolocation_to_mdb(geolocation_list, _id,
+                                    nodes_info_dict[_id], ipfs_db)
+            print nodes_info_dict
+            print geolocation_list
         except:
             print sys.exc_info()[0]        
 
