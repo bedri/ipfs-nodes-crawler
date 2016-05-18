@@ -28,8 +28,11 @@ def main():
 
 
 def default_crawler():
+    """
+    Unused?
+    """
     ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
-    logging.info("RUNNING 'ipfs diag net'")
+    logging.info("RUNNING ipfs diag net")
     ipfs_diag_net_output=ipfs_diag_net()
     logging.info("GETTING NODE IDs")
     nodes_ids_set = get_nodes_ids(ipfs_diag_net_output)
@@ -37,11 +40,8 @@ def default_crawler():
     nodes_info_list = get_nodes_info(nodes_ids_set, ipfs_client)
     ips_set = set()
     id_ips_dict = dict()
-    
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.nodes
-
-
     for node_info in nodes_info_list:
         if node_info["Responses"] is not None:
             try:
@@ -66,8 +66,6 @@ def default_crawler():
             except:
                 error = sys.exc_info()[0]
                 logging.error("ERROR PROCESSING NODE INFO: %s", error)
-    
- 
     if nodes_ids_set: 
         to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
@@ -100,46 +98,52 @@ def get_nodes_ids(ipfs_diag_net_out):
 def get_nodes_info_id():
     """
     From 'id <id>'
-    subprocess.check_output 
+    subprocess.check_output(["ipfs", "id", _id]) 
     """
+    
+    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
+    logging.info("RUNNING ipfs diag net")
+    ipfs_diag_net_output=ipfs_diag_net()
+    logging.info("GETTING NODE IDs")
+    nodes_ids_set = get_nodes_ids(ipfs_diag_net_output)
     
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.id2ip
     
-    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
-    ids_set = set(line.rstrip('\n') for line in open('nodes_ids'))
-#    ips_set = set()
-#    nodes_info_dict = dict()
-    for _id in ids_set:
+    for _id in nodes_ids_set:
         ips_set = set()
         nodes_info_dict = dict()
         geolocation_list = list() 
         try:
+            logging.info("GETTING NODE INFO WITH ipfs id %s", _id)
             id_str = subprocess.check_output(["ipfs", "id", _id])
             id_json = json.loads(id_str)
             addresses = id_json["Addresses"]
             if isinstance(addresses, list):
+                logging.info("ITERATING THROUGH ALL IPs %s", addresses)
                 for _ip in addresses:
                     ip = _ip.split("/")[2]
+                    logging.info("Checking IP %s ", ip)
                     if not ipaddress.ip_address(unicode(ip)).is_private:
                         ips_set.add(ip)
-             
             nodes_info_dict = ({_id:ips_set})
             geolocation_list = geolocation(nodes_info_dict[_id])
-            
             if geolocation_list:
-               geolocation_to_mdb(geolocation_list, _id,
-                                    nodes_info_dict[_id], ipfs_db)
+                geolocation_to_mdb(geolocation_list, _id, nodes_info_dict[_id],
+                                id_json["AgentVersion"], id_json["ProtocolVersion"],
+                                id_json["PublicKey"], ipfs_db)
             print nodes_info_dict
             print geolocation_list
         except:
-            print sys.exc_info()[0]        
+            error = sys.exc_info()[0]
+            logging.error("ERROR PROCESSING NODE ID: %s", error)
 
 
 
 
 def get_nodes_info(node_ids_set, ipfs_client):
     """
+    Unused?
     Returns list of raw info of the nodes, sometimes it gets string instead of dict, which is handled differently.
     From 'dht findpeer'
     """
@@ -162,6 +166,7 @@ def get_nodes_info(node_ids_set, ipfs_client):
 
 def parse_unicode_string(node_info):
     """
+    Unused?
     Function to parse and create dicts from the unicode strings returned by ipfs net diag
     (this happens when multiple DHT nodes are traversed)
     Returns list of dicts
@@ -179,6 +184,7 @@ def parse_unicode_string(node_info):
 
 def get_id_ips(node_info):
     """
+    Unused?
     Parsing IPs from the raw node info
     """
     ips_list = list()
@@ -213,7 +219,8 @@ def geolocation(ips_set):
     return geolocation_list
 
 
-def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
+def geolocation_to_mdb(geolocation_list, node_id, ips_set, agent_version,
+                        protocol_version, public_key, ipfs_db):
     """
     Update location, ip and country to mongoDB ( do not insert new ones )
     """
@@ -222,6 +229,9 @@ def geolocation_to_mdb(geolocation_list, node_id, ips_set, ipfs_db):
         document = {"node_id":node_id,
 #                    "ips_set":str(ips_set),
                     "ip":node.ip,
+                    "agent_version":agent_version,
+                    "protocol_version":protocol_version,
+                    "public_key":public_key,
                     "country":node.country,
                     "continent":node.continent,
                     "subdivisions":str(node.subdivisions),
