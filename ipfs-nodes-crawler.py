@@ -8,7 +8,8 @@ from geoip import geolite2
 import sys
 import json
 import logging
-import ipfsApi
+# not needed for thin_crawler only for fat_crawler
+#import ipfsApi
 import ipaddress
 import subprocess
 import pymongo
@@ -67,6 +68,11 @@ def fat_crawler():
                 error = sys.exc_info()[0]
                 logging.error("ERROR PROCESSING NODE INFO: %s", error)
 
+
+def dump2files(nodes_ids_set, ips_set, nodes_info_list):
+    """
+    Helper function, for writing data to files
+    """
     if nodes_ids_set: 
         to_file(nodes_ids_set, "nodes_ids", "a")
     if ips_set:
@@ -80,7 +86,8 @@ def ipfs_diag_net():
     Gets raw output from:
     ipfs diag net
     """
-    return subprocess.check_output("ipfs diag net", shell=True)
+    #return subprocess.check_output("ipfs diag net", shell=True)
+    return subprocess.check_output(["ipfs", "diag", "net"])
 
 
 def get_nodes_ids(ipfs_diag_net_out):
@@ -96,6 +103,14 @@ def get_nodes_ids(ipfs_diag_net_out):
     return node_ids_set
 
 
+def pinger(id):
+    """
+    Returns latency status of the node in a form of list
+    """
+    ping_status = subprocess.check_output(["ipfs", "ping", id, "-n", "2"])
+    return ping_status.strip().split("\n")
+
+
 def address_list2address_set(address_list):
     """
     Helper function for parsing and converting address list to addres set
@@ -106,18 +121,18 @@ def address_list2address_set(address_list):
         address_set.add(address)
     return address_set
 
+
 def thin_crawler():
     """
     From 'id <id>'
     subprocess.check_output(["ipfs", "id", _id]) 
     """
     logging.info("thin_crawler mode") 
-    ipfs_client = ipfsApi.Client('127.0.0.1', 5001)
-    logging.info("RUNNING ipfs diag net")
+    logging.info("Running \'ipfs diag net\'")
     ipfs_diag_net_output=ipfs_diag_net()
-    logging.info("GETTING NODE IDs")
+    logging.info("Getting nodes IDs")
     nodes_ids_set = get_nodes_ids(ipfs_diag_net_output)
-    logging.info("FOUND %s IDs", len(nodes_ids_set)) 
+    logging.info("Found %s IDs", len(nodes_ids_set)) 
     mongo_client = pymongo.MongoClient()
     ipfs_db = mongo_client.ipfs.id2ip
     
@@ -126,17 +141,20 @@ def thin_crawler():
         nodes_info_dict = dict()
         geolocation_list = list() 
         try:
-            logging.info("GETTING NODE INFO WITH ipfs id %s", _id)
+            logging.info("Getting node info with \'ipfs id %s\'", _id)
+            #todo: multithreading
             id_str = subprocess.check_output(["ipfs", "id", _id])
             id_json = json.loads(id_str)
             addresses = id_json["Addresses"]
             if isinstance(addresses, list):
                 addresses_set = address_list2address_set(addresses)
-                logging.info("ITERATING THROUGH ALL IPs %s", addresses_set)
+                logging.info("Iterating through IPs %s", addresses_set)
                 for ip in addresses_set:
                     logging.info("Checking IP %s ", ip)
                     if not ipaddress.ip_address(unicode(ip)).is_private:
                         ips_set.add(ip)
+            else:
+                logging.info("Did not got info from %s. Probably \'null\' address list", _id)
             nodes_info_dict = ({_id:ips_set})
             geolocation_list = geolocation(nodes_info_dict[_id])
             if geolocation_list:
@@ -145,9 +163,7 @@ def thin_crawler():
                                 id_json["PublicKey"], ipfs_db)
         except:
             error = sys.exc_info()[0]
-            logging.error("ERROR PROCESSING NODE ID: %s", error)
-
-
+            logging.error("Error processing node %s: %s", _id, error)
 
 
 def get_nodes_info(node_ids_set, ipfs_client):
@@ -156,14 +172,14 @@ def get_nodes_info(node_ids_set, ipfs_client):
     From 'dht findpeer'
     """
     node_info_list = list()
-    logging.info("SEARCHING NODE INFO ON DHT")
+    logging.info("Searching node info on DHT")
     for set_item in node_ids_set:
         logging.info("Parsing node %s", set_item)
         try:
             node_info = ipfs_client.dht_findpeer(set_item, timeout=10)
         except:
             error = sys.exc_info()[0]
-            logging.error("ERROR PARSING DHT: %s", error)
+            logging.error("Error parsing DHT: %s", error)
         if isinstance(node_info, dict):
             node_info_list.append(node_info)
         elif isinstance(node_info, list):
@@ -188,6 +204,7 @@ def parse_unicode_string(node_info):
             logging.info("Node json from unicode: %s", node_json)
             node_info_list_d.append(node_json)
     return node_info_list_d
+
 
 def get_id_ips(node_info):
     """
